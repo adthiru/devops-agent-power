@@ -36,7 +36,7 @@ Best for: cost optimization, architecture review, topology mapping, knowledge di
 
 ```
 1. aws___call_aws(cli_command="aws devops-agent list-agent-spaces --region us-east-1") → agentSpaceId
-2. aws___call_aws(cli_command="aws devops-agent create-backlog-task --agent-space-id SPACE_ID --task-type INVESTIGATION --title '...' --priority HIGH --description '...' --region us-east-1") → taskId (executionId becomes available from get-backlog-task once IN_PROGRESS)
+2. aws___call_aws(cli_command="aws devops-agent create-backlog-task --agent-space-id SPACE_ID --task-type INVESTIGATION --title '...' --priority HIGH --description '...' --region us-east-1") → taskId + executionId (executionId is returned immediately but may also be fetched later via get-backlog-task)
 3. Poll every 30-45s: aws___call_aws(cli_command="aws devops-agent get-backlog-task --agent-space-id SPACE_ID --task-id TASK_ID --region us-east-1") until status=IN_PROGRESS
 4. Stream: aws___call_aws(cli_command="aws devops-agent list-journal-records --agent-space-id SPACE_ID --execution-id EXEC_ID --region us-east-1") every 30-45s while IN_PROGRESS
 5. Once COMPLETED: aws___call_aws(cli_command="aws devops-agent list-recommendations --agent-space-id SPACE_ID --task-id TASK_ID --region us-east-1") → get-recommendation → generate remediation code
