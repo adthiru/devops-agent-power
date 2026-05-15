@@ -100,7 +100,9 @@ Poll every 30-45 seconds:
 
 ```
 aws___call_aws(cli_command="aws devops-agent get-backlog-task --agent-space-id as-abc123 --task-id task-inv-001 --region us-east-1")
-→ { "taskStatus": "IN_PROGRESS", "executionId": "exec-inv-001" }
+→ { "taskStatus": "IN_PROGRESS", "executionId": "exe-ops1-abc123..." }
+
+> **Important:** Investigation executionIds use `exe-ops1-*` format. Use `aws___call_aws` CLI (not `call_boto3`) for all investigation operations — `list-journal-records`, `get-backlog-task`, `list-recommendations`.
 ```
 
 Fetch journal records with pagination:
