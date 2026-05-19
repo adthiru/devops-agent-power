@@ -1,3 +1,6 @@
+---
+inclusion: auto
+---
 # Walkthrough: ECS 503 incident — chat triage → investigation → mitigation
 
 This is a worked example showing the full power in action: instant chat triage, deep investigation with streamed progress, empty-recommendations recovery via `UpdateBacklogTask PENDING_START`, and local IaC fix generation.
