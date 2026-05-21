@@ -666,9 +666,16 @@ AS SELECT * FROM cloud_files('/Volumes/main/raw/orders', 'json');
 - **Databricks workspace** — AWS, Azure, or GCP
 - **Databricks CLI** (optional, for OAuth login) — [install](https://docs.databricks.com/en/dev-tools/cli/install.html)
 
-### Step 1: Run the Official Installer
+### Step 1: Run the Official Installer (with pre-snapshot)
+
+The installer pulls skills from **four upstream sources** (`databricks-solutions/ai-dev-kit/databricks-skills/`, `mlflow/skills/`, `databricks-solutions/apx/`, `databricks/databricks-agent-skills/`) and writes them into `~/.kiro/skills/`. To track exactly which skills this Power is responsible for — so we can move them precisely in Step 2 and clean them up precisely on uninstall — snapshot the directory **before** the installer runs.
 
 ```bash
+# Snapshot the pre-install state (empty list is fine if the directory doesn't exist yet)
+mkdir -p "$HOME/.kiro/skills"
+ls -1 "$HOME/.kiro/skills" 2>/dev/null | sort > /tmp/kiro-skills-before.txt
+
+# Run the installer
 bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools kiro --global --silent
 ```
 
@@ -685,14 +692,55 @@ bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-ki
 - `--force` — Reinstall even if up to date
 - `--skills-only` — Skip MCP server setup
 
-### Step 2: Copy Skills to the Power's Steering Directory
+### Step 2: Build a Manifest, Then Copy Skills to the Power's Steering Directory
+
+Use the pre-install snapshot from Step 1 to compute exactly which skill directories the installer added. Persist that list as a manifest inside the Power's installed directory so future updates and the uninstall flow operate on the exact same set of files (no glob guessing, no leftover skills, no accidental deletion of unrelated files).
+
+**Agent execution note:** Run the bash block below as a single inline `bash -c '...'` invocation. Do **not** write it to a scratch file like `/tmp/kiro-step2.sh` first — Kiro's sandbox blocks `Write`-tool writes to `/tmp/`, even though shell-internal redirects (e.g., `> /tmp/kiro-skills-after.txt` *from inside* `bash -c`) are allowed. Skipping the file-write attempt avoids a noisy "Access denied" error and lets execution succeed on the first try.
 
 ```bash
-POWER_STEERING="$HOME/.kiro/powers/installed/databricks/steering"
+POWER_DIR="$HOME/.kiro/powers/installed/databricks"
+POWER_STEERING="$POWER_DIR/steering"
+MANIFEST="$POWER_DIR/.skill-manifest.txt"
+
+# Snapshot post-install state
+ls -1 "$HOME/.kiro/skills" 2>/dev/null | sort > /tmp/kiro-skills-after.txt
+
+# Compute the diff: skills that exist now but didn't before. This is what the installer added.
+comm -13 /tmp/kiro-skills-before.txt /tmp/kiro-skills-after.txt > "$MANIFEST.tmp"
+
+# Reset the steering directory and write the manifest
 rm -rf "$POWER_STEERING"
 mkdir -p "$POWER_STEERING"
-cp -r "$HOME/.kiro/skills/"* "$POWER_STEERING/" 2>/dev/null || true
-rm -rf "$HOME/.kiro/skills/databricks-"* "$HOME/.kiro/skills/mlflow-"* "$HOME/.kiro/skills/spark-"* "$HOME/.kiro/skills/agent-"* "$HOME/.kiro/skills/analyze-"* "$HOME/.kiro/skills/instrumenting-"* "$HOME/.kiro/skills/querying-"* "$HOME/.kiro/skills/retrieving-"* "$HOME/.kiro/skills/searching-"*
+mv "$MANIFEST.tmp" "$MANIFEST"
+
+# Copy each manifested skill into the Power's steering directory, then delete the original
+while IFS= read -r skill; do
+  [ -z "$skill" ] && continue
+  src="$HOME/.kiro/skills/$skill"
+  if [ -e "$src" ]; then
+    cp -r "$src" "$POWER_STEERING/$skill"
+    rm -rf "$src"
+  fi
+done < "$MANIFEST"
+
+# Clean up scratch files
+rm -f /tmp/kiro-skills-before.txt /tmp/kiro-skills-after.txt
+
+echo "Installed $(wc -l < "$MANIFEST" | tr -d ' ') skills to $POWER_STEERING"
+echo "Manifest saved to $MANIFEST"
+```
+
+**Why this is more robust than glob-based cleanup:**
+
+- The manifest captures the **exact** set of skills the installer wrote, regardless of upstream naming conventions or new skill sources added later
+- Uninstall and update flows can replay the manifest to remove or refresh only what the Power owns — no risk of deleting skills installed by other tools
+- The manifest is human-readable; you can `cat ~/.kiro/powers/installed/databricks/.skill-manifest.txt` to audit what the Power is responsible for
+
+**Edge case — incremental reinstall:** if `comm -13` returns an empty manifest (e.g., you re-ran Step 1 without first removing `~/.kiro/skills/`), the installer detected the skills were already installed and skipped them. In that case, regenerate the manifest from the existing steering directory:
+
+```bash
+ls -1 "$POWER_STEERING" 2>/dev/null | sort > "$MANIFEST"
 ```
 
 This scopes skills to the Power (loaded only when the Power is active) and removes duplicates from the global skills namespace. Click **Update** on the Databricks Power in Kiro afterward to refresh the steering files list.
@@ -1024,10 +1072,40 @@ A successful response confirms auth, env-var resolution, and server enablement a
 
 ### Updating Skills
 
+Re-run the snapshot/installer/diff pattern from Steps 1 and 2 so the manifest gets regenerated with any newly-added or removed skills:
+
 ```bash
+# 1. Snapshot the current Power-owned manifest as the "before" baseline
+POWER_DIR="$HOME/.kiro/powers/installed/databricks"
+ls -1 "$POWER_DIR/steering" 2>/dev/null | sort > /tmp/kiro-skills-before.txt
+
+# 2. Re-run the installer in skills-only force-refresh mode
 bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh) --tools kiro --global --skills-only --force --silent
+
+# 3. Re-run Step 2's diff-and-move snippet to refresh the manifest and steering directory
 ```
-Then re-run Step 2.
+
+After updating, click **Update** on the Power in Kiro to pick up any new skills.
+
+### Uninstalling Skills
+
+The manifest makes uninstall surgical — only the skills this Power owns get removed:
+
+```bash
+POWER_DIR="$HOME/.kiro/powers/installed/databricks"
+MANIFEST="$POWER_DIR/.skill-manifest.txt"
+
+if [ -f "$MANIFEST" ]; then
+  while IFS= read -r skill; do
+    [ -z "$skill" ] && continue
+    rm -rf "$HOME/.kiro/skills/$skill"
+  done < "$MANIFEST"
+fi
+
+rm -rf "$POWER_DIR"
+```
+
+This will not touch skills installed by other tools or other Powers, even if they happen to share a name prefix.
 
 ## Tips
 
