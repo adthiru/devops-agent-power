@@ -212,7 +212,7 @@ These MUST be kept in sync with the `discover_subagents()` tool in `tools/orches
 | `chatAgentIdentifier` | string | Yes | Unique identifier for chat routing (use agent name) |
 | `a2aSupported` | boolean | Yes | Whether agent supports Agent-to-Agent protocol |
 
-> **Note:** If the agent is already registered (`ConflictException`), use `UpdateAgent` to modify `jobOrchestratorMetadata` (including `chatUILabel`) — it is fully updatable post-registration.
+> **Warning:** `jobOrchestratorMetadata` (`chatUILabel`, `chatAgentIdentifier`, `a2aSupported`) is set at `RegisterAgent` time and **cannot be updated** afterward — `UpdateAgent` only accepts `customerConfiguredAgentDependencies`, `marketplaceMetadata`, and `deprecated`. To fix a wrong value (e.g. `a2aSupported: false`), you must re-register under a different agent name. Choose carefully.
 
 ### Complete Examples
 
@@ -552,7 +552,7 @@ The minimum structure that passes boto3 and server-side validation (works for bo
     "tags": ["analysis", "assessment"],
     "capabilities": {
       "restartable": true,
-      "a2aSupported": false,
+      "a2aSupported": true,
       "legacyDashboard": false,
       "legacyTaskLink": false,
       "webAppV2": true,
