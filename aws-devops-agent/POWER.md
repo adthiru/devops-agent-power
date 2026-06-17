@@ -81,7 +81,7 @@ You are enhanced with the **AWS DevOps Agent**, an AI-powered operational intell
 
 Two auth options. Both connect to the same remote DevOps Agent endpoint — they differ in how they authenticate:
 
-- **Option A (Bearer token):** Zero local dependencies. Tools scoped by token (see "Tool Availability by Auth Mode"). Best for single AgentSpace setups.
+- **Option A (Bearer token):** Zero local dependencies. Tools scoped by token (see "Tool Availability by Auth Mode"). Best for day-to-day operation.
 - **Option B (SigV4):** Requires `uvx` locally. All tools available (limited only by IAM policy). Best for multi-space routing or admin configuration.
 
 > **Note:** `aws-mcp` and `aws-devops-agent-sigv4` both require `uvx` (part of `uv`). If `uvx` is not in your PATH, these servers cannot launch.
@@ -126,7 +126,7 @@ Two auth options. Both connect to the same remote DevOps Agent endpoint — they
 
 | Tool | Purpose | Scope |
 |------|---------|-------|
-| `create_release_readiness_review` | Start release readiness review on a PR | `agent:operate` |
+| `create_release_readiness_review` | Start release readiness review on a PR/MR/CR | `agent:operate` |
 | `cancel_release_readiness_review` | Cancel a running release readiness review | `agent:operate` |
 | `get_release_readiness_report` | Retrieve the final release readiness report | `agent:read` |
 
@@ -170,8 +170,8 @@ The tools visible to you depend on the authentication method and token scope:
 | Scope | Available Tools | Notes |
 |-------|----------------|-------|
 | Bearer `agent:read` | `get_agent_space`, `list_associations`, `get_task`, `list_tasks`, `list_journal_records`, `list_executions`, `list_recommendations`, `get_recommendation`, `list_goals`, `list_chats`, QA reports | Read-only — can poll investigations but NOT start them |
-| Bearer `agent:operate` | All read tools + `investigate`, `chat`, `create_chat`, `send_message`, `create_investigation`, `update_recommendation`, `start_evaluation`, `create_release_testing_job`, `cancel_release_testing_job`, `create_release_readiness_review`, `cancel_release_readiness_review` | Full agent interaction — **this is the recommended scope** |
-| SigV4 (fallback `aws-mcp`) | All tools (read + write) + `list_agent_spaces`, `list_services`, `get_service` | Limited only by IAM policy, not token scope |
+| Bearer `agent:operate` | All read tools + `investigate`, `chat`, `create_chat`, `send_message`, `create_investigation`, `update_recommendation`, `start_evaluation`, release testing, release readiness review | Full agent interaction — **this is the recommended scope** |
+| SigV4 (fallback `aws-mcp`) | All tools + `list_agent_spaces`, `list_services`, `get_service` | Limited only by IAM policy, not token scope |
 
 **Key behaviors:**
 - The tools you see depend on your token's scope (bearer) or IAM permissions (SigV4). A scoped read-only token will not show write/operate tools.
@@ -199,7 +199,7 @@ When the user describes a problem, **automatically choose the right workflow**:
 
 ### → Release Readiness Review (pre-merge, 10+ min)
 
-**Triggers**: release analysis, analyze PR, analyze MR, review PR, risk analysis, pre-merge, safe to ship, ready to merge, ready to commit, any risks, before merging, validate changes, release management, pull request
+**Triggers**: release analysis, analyze PR, analyze CR, analyze MR, review PR, risk analysis, pre-merge, safe to ship, ready to merge, ready to commit, any risks, before merging, validate changes, release management
 
 **Action**: Load `steering/release-readiness.md` for content format, then `create_release_readiness_review(content={...})` → poll `get_task` + `list_journal_records` → `get_release_readiness_report`
 
@@ -326,7 +326,11 @@ investigate(title="ECS 503 errors on checkout-service — OOM suspected", priori
 
 ## Fallback: When Remote Server Is Unavailable
 
-If bearer token (`aws-devops-agent`) or SigV4 (`aws-devops-agent-sigv4`) isn't working, fall back to `aws-mcp` using the manual CLI patterns below:
+**Fallback chain**: `aws-devops-agent` (bearer token) → `aws-devops-agent-sigv4` (SigV4 proxy to same endpoint) → `aws-mcp` (generic AWS CLI).
+
+If `aws-devops-agent` tools return connection errors, timeouts, or 503s, try `aws-devops-agent-sigv4` first — it exposes the same tools (chat, investigate, etc.) via SigV4 auth instead of a bearer token. No workflow changes needed.
+
+If `aws-devops-agent-sigv4` is also unavailable (e.g., AWS credentials not configured), fall back to `aws-mcp` using the manual CLI patterns below:
 
 **Chat fallback:**
 ```
@@ -493,7 +497,11 @@ These tools are read-only and cannot modify any AWS resource or DevOps Agent sta
 
 ---
 
-## Support
+## Support & Legal
 
-- [AWS DevOps Agent User Guide](https://docs.aws.amazon.com/devopsagent/latest/userguide/)
-- [AWS Support Center](https://console.aws.amazon.com/support/)
+- **Documentation**: [AWS DevOps Agent User Guide](https://docs.aws.amazon.com/devopsagent/latest/userguide/)
+- **Setup for DevOps Agent Remote Server**: [Connect to DevOps Agent Remote Servers](https://docs.aws.amazon.com/devopsagent/latest/userguide/accessing-devops-agent-connect-to-devops-agent-remote-servers.html)
+- **Setup for the AWS MCP Server**: [AWS MCP Server Getting Started](https://docs.aws.amazon.com/agent-toolkit/latest/userguide/getting-started-aws-mcp-server.html)
+- **Support**: [AWS Support Center](https://console.aws.amazon.com/support/)
+- **License**: Apache-2.0
+- **Privacy**: [AWS Privacy Notice](https://aws.amazon.com/privacy/)

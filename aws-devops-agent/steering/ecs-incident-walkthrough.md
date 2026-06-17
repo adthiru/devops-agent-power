@@ -1,5 +1,4 @@
 ---
-inclusion: auto
 name: ecs-incident-walkthrough
 description: Worked example of the full ECS incident workflow — chat triage, deep investigation with streamed progress, mitigation retrieval, and local IaC fix. Use when investigating ECS 503 errors, service outages, or deployment failures.
 ---
