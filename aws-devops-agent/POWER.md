@@ -199,7 +199,7 @@ When the user describes a problem, **automatically choose the right workflow**:
 
 ### → Release Readiness Review (pre-merge, 10+ min)
 
-**Triggers**: release analysis, analyze PR, analyze CR, analyze MR, review PR, risk analysis, pre-merge, safe to ship, ready to merge, ready to commit, any risks, before merging, validate changes, release management
+**Triggers**: release analysis, analyze PR, analyze MR, review PR, risk analysis, pre-merge, safe to ship, ready to merge, ready to commit, any risks, before merging, validate changes, release management, pull request
 
 **Action**: Load `steering/release-readiness.md` for content format, then `create_release_readiness_review(content={...})` → poll `get_task` + `list_journal_records` → `get_release_readiness_report`
 
